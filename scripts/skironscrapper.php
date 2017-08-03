@@ -4,6 +4,7 @@
 class SkironScrapperJob
 {
     private $downloadUrl, $parserPath, $outputPath, $workFoler, $gribFile;
+    private $phpProcess;
 
     public static function createWeakStreamContext()
     {
@@ -27,6 +28,11 @@ class SkironScrapperJob
         $this->parserPath = $parserPath;
         $this->outputPath = $outputPath;
         $this->workFoler = $workFoler;
+    }
+
+    public function getName()
+    {
+        return $this->downloadUrl;
     }
 
     private function downloadAndExtractFile()
@@ -67,23 +73,82 @@ class SkironScrapperJob
             ),
             'r'
         );
+
         $output = '';
         while (!feof($handler)) {
             $output .= fgets($handler);
         }
+
         $output = trim($output);
         if (pclose($handler) !== 0) {
             throw new \RuntimeException("Error was occurred when executing parser. " . $output);
+        }
+
+        return 0;
+    }
+
+    static public function executeAsProcess($serializedValue)
+    {
+        $obj = unserialize(base64_decode($serializedValue));
+        return $obj->doJob();
+    }
+
+    public function isDone()
+    {
+        if ($this->phpProcess == null) {
+            return false;
+        }
+
+        if (!is_resource($this->phpProcess)) {
+            return true;
+        }
+
+        $status = proc_get_status($this->phpProcess);
+        if (empty($status['running'])) {
+            proc_close($this->phpProcess);
+            return true;
+        }
+
+        return false;
+    }
+
+    public function isRunning()
+    {
+        if ($this->phpProcess == null) {
+            return false;
+        }
+
+        $status = proc_get_status($this->phpProcess);
+        return !empty($status['running']);
+    }
+
+    private function doJob()
+    {
+        try {
+            $this->gribFile = $this->downloadAndExtractFile();
+            return $this->runParser($this->gribFile);
+        } finally {
+            @unlink($this->gribFile);
         }
     }
 
     public function run()
     {
-        try {
-            $this->gribFile = $this->downloadAndExtractFile();
-            $this->runParser($this->gribFile);
-        } finally {
-            @unlink($this->gribFile);
+        global $argv;
+
+        $serializedJob = base64_encode(serialize($this));
+        $this->phpProcess = proc_open(
+            sprintf(
+                "php \"%s\" --job=%s",
+                $argv[0],
+                $serializedJob
+            ),
+            [],
+            $pipes
+        );
+
+        if (!is_resource($this->phpProcess)) {
+            throw new \RuntimeException('Cant launch job php process.');
         }
     }
 }
@@ -158,26 +223,51 @@ class SkironScrapperApplication
             $this->getContent()
         );
 
+        $jobs = [];
+
         foreach($files as $file) {
             if (!preg_match(';.+/(.+)_SKIRON_WAM_.+$;i', $file, $matchSubfolder)) {
                 continue;
             }
-            echo "Process $file\n";
-            (new SkironScrapperJob($file, $this->parserPath, $this->output . '/' . ucfirst(strtolower($matchSubfolder[1])), $this->workPath))
-                ->run();
+            $jobs[] = new SkironScrapperJob($file, $this->parserPath, $this->output . '/' . ucfirst(strtolower($matchSubfolder[1])), $this->workPath);
         }
+
+        $currentJobsCount = 0;
+        echo "Jobs count is " . count($jobs) . "\n";
+        while(count($jobs) > 0) {
+            foreach($jobs as $job) {
+                if ($job->isDone()) {
+                    echo "Done {$job->getName()}.\n";
+                    array_splice($jobs, array_search($job, $jobs), 1);
+                    $currentJobsCount -= 1;
+                    continue;
+                }
+                if (!$job->isRunning() && $currentJobsCount < $this->concurrency) {
+                    $job->run();
+                    echo "Started {$job->getName()}...\n";
+                    $currentJobsCount += 1;
+                }
+            }
+
+            usleep(10000);
+        } 
+
         echo "Done!\n";
     }
 }
 
 
-SkironScrapperApplication::getInstance()
-    ->setOptions(getopt('', [
-            'output:',
-            'concurrency:',
-            'workPath::',
-            'parserPath:',
-            'url::',
-        ]
-    ))
-    ->run();
+if ($argc == 2 && strpos($argv[1], '--job=') === 0) {
+    exit(SkironScrapperJob::executeAsProcess(substr($argv[1], 6)));
+} else {
+    SkironScrapperApplication::getInstance()
+        ->setOptions(getopt('', [
+                'output:',
+                'concurrency:',
+                'workPath::',
+                'parserPath:',
+                'url::',
+            ]
+        ))
+        ->run();
+}
