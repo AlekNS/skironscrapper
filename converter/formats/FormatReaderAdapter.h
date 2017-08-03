@@ -27,6 +27,7 @@ public:
         double dLon;
         u_int sizeX;
         u_int sizeY;
+        double zeroValue;
         double **data;
     };
 

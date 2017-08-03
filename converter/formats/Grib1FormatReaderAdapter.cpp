@@ -86,6 +86,7 @@ const FormatReaderAdapter::Layer Grib1FormatReaderAdapter::getLayerData() {
 
     layer.sizeX = static_cast<u_int>(record.nx);
     layer.sizeY = static_cast<u_int>(record.ny);
+    layer.zeroValue = record.ref_val;
     layer.data = record.gridpoints;
 
     return layer;

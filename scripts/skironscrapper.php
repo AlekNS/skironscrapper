@@ -250,7 +250,7 @@ class SkironScrapperApplication
             }
 
             usleep(10000);
-        } 
+        }
 
         echo "Done!\n";
     }

@@ -84,7 +84,7 @@ void OutputWriter::writeLayer(const FormatReaderAdapter::Layer &layer) {
               static_cast<int>(layer.minLat * 1000), static_cast<int>(layer.maxLat * 1000),
               static_cast<int>(layer.minLon * 1000), static_cast<int>(layer.maxLon * 1000),
               static_cast<int>(layer.dLat * 1000), static_cast<int>(layer.dLon * 1000),
-              0.0f,
+              static_cast<float>(layer.zeroValue),
               false
     );
 
