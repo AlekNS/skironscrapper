@@ -91,15 +91,15 @@ void OutputWriter::writeLayer(const FormatReaderAdapter::Layer &layer) {
     double lat, lon = layer.minLon;
 
     for(int y = 0; y < layer.sizeY; y += 1) {
-        lat = layer.minLat;
+        lon = layer.minLon;
 
         for(int x = 0; x < layer.sizeX; x += 1) {
             wgf3.writeAvgF(static_cast<float>(lat), static_cast<float>(lon), static_cast<float>(layer.data[y][x]));
 
-            lat += layer.dLat;
+            lon += layer.dLon;
         }
 
-        lon += layer.dLon;
+        lat += layer.dLat;
     }
 
     if (isDebugging) {

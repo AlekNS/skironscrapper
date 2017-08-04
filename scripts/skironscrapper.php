@@ -179,7 +179,7 @@ class SkironScrapperApplication
             $this->workPath = @$options['workPath'] ?: $this->workPath;
             $this->output = @$options['output'] ?: $this->output;
             $this->parserPath = @$options['parserPath'] ?: $this->parserPath;
-            $this->concurrency = max(min(@$options['concurrency'] ?: $this->concurrency, 16), 1);
+            $this->concurrency = max(min(@$options['concurrency'] ?: $this->concurrency, 1), 1); // disabled
         }
 
         if (empty($this->output)) {
@@ -229,7 +229,7 @@ class SkironScrapperApplication
             if (!preg_match(';.+/(.+)_SKIRON_WAM_.+$;i', $file, $matchSubfolder)) {
                 continue;
             }
-            $jobs[] = new SkironScrapperJob($file, $this->parserPath, $this->output . '/' . ucfirst(strtolower($matchSubfolder[1])), $this->workPath);
+            $jobs[] = new SkironScrapperJob($file, $this->parserPath, $this->output . '/', $this->workPath);
         }
 
         $currentJobsCount = 0;
